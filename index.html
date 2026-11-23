@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tablero de MaderUP</title>
+<style>
+  /* Paleta de MaderUP (verde bosque, madera, beige, carbón). Tablero de uso del dueño: se lee rápido y se opera con una mano. */
+  :root { --bg:#F4EBDD; --fg:#303331; --card:#fffaf1; --line:#d8c5a5; --verde:#243B32; --muted:#6b6f6c; --ok:#2e7d4f; --mal:#b3541e; --soft:#efe3cd; --input:#fffdf8; --onverde:#F4EBDD; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d211f; --fg:#ece6da; --card:#272c29; --line:#444b46; --verde:#8fc2a3; --muted:#a3a8a4; --ok:#6fcf97; --mal:#f2a36b; --soft:#2f3531; --input:#202522; --onverde:#1d211f; color-scheme: dark; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:20px max(16px, env(safe-area-inset-left)); }
+  main { max-width:1100px; margin:0 auto; }
+  h1 { color:var(--verde); margin:0 0 4px; font-size:24px; } h2 { margin:0 0 8px; font-size:18px; color:var(--verde); }
+  .sub { color:var(--muted); font-size:13px; }
+  .top { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+  button, input, select, textarea { font:inherit; }
+  .tab { padding:10px 16px; border-radius:99px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; min-height:44px; }
+  .tab[aria-selected=true] { background:var(--verde); color:var(--onverde); border-color:var(--verde); }
+  .btn { padding:8px 14px; border-radius:10px; border:1px solid var(--verde); background:var(--verde); color:var(--onverde); cursor:pointer; min-height:40px; }
+  .btn.sec { background:transparent; color:var(--verde); } .btn.mal { border-color:var(--mal); background:transparent; color:var(--mal); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  input, select, textarea { padding:9px; border-radius:8px; border:1px solid var(--line); background:var(--input); color:var(--fg); width:100%; min-height:40px; }
+  :focus-visible { outline:2px solid var(--verde); outline-offset:2px; }
+  label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .login { max-width:420px; margin:12vh auto 0; display:grid; gap:12px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+  .kpi b { display:block; font-size:26px; color:var(--verde); font-variant-numeric:tabular-nums; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; min-width:720px; background:var(--card); border:1px solid var(--line); }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); background:var(--soft); }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pill { display:inline-block; border-radius:99px; padding:1px 10px; font-size:12px; border:1px solid var(--line); }
+  .pill.ok { color:var(--ok); border-color:var(--ok); } .pill.mal { color:var(--mal); border-color:var(--mal); }
+  .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  dialog { border:1px solid var(--line); border-radius:14px; background:var(--card); color:var(--fg); padding:18px; width:min(440px, calc(100vw - 32px)); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; } @media (max-width:520px) { .grid2 { grid-template-columns:1fr; } }
+  .alert { margin:8px 0; padding:10px 14px; border-radius:10px; border:1px solid var(--mal); border-left-width:6px; background:var(--card); }
+  .alert.bad { border-color:var(--mal); font-weight:600; } .alert.warn { border-color:#c99a2e; }
+  .msg { margin:10px 0; padding:8px 12px; border-radius:8px; background:var(--soft); } .msg.error { color:var(--mal); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body><main>
+
+<section id="login" class="card login" hidden>
+  <h1>Tablero de MaderUP</h1>
+  <p class="sub">Solo para el dueño. Te mandamos un código por email.</p>
+  <label for="l-email">Email<input id="l-email" type="email" autocomplete="email" placeholder="tu@email.com"></label>
+  <label id="l-code-wrap" for="l-code" hidden>Código que te llegó<input id="l-code" inputmode="numeric" autocomplete="one-time-code"></label>
+  <button id="l-go" class="btn">Enviarme el código</button>
+  <div id="l-msg" class="msg" hidden></div>
+</section>
+
+<section id="app" hidden>
+  <div class="top">
+    <div><h1>Tablero de MaderUP</h1><div class="sub" id="who"></div></div>
+    <div class="acts"><button id="refresh" class="btn sec">Actualizar</button><button id="logout" class="btn sec">Salir</button></div>
+  </div>
+  <div id="alerts"></div>
+  <div id="kpis" class="kpis"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-t="clientes" aria-selected="true">Clientes</button>
+    <button class="tab" role="tab" data-t="leads" aria-selected="false">Posibles clientes</button>
+    <button class="tab" role="tab" data-t="vencen" aria-selected="false">Por vencer</button>
+    <button class="tab" role="tab" data-t="cobros" aria-selected="false">Cobros</button>
+    <button class="tab" role="tab" data-t="costos" aria-selected="false">Costos</button>
+    <button class="tab" role="tab" data-t="uso" aria-selected="false">Uso</button>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+  <div id="view"></div>
+</section>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlg-form">
+    <h2 id="dlg-title">Registrar cobro</h2>
+    <p class="sub" id="dlg-who"></p>
+    <div class="grid2">
+      <label for="d-dias">Por cuánto tiempo<select id="d-dias"><option value="30">30 días (mensual)</option><option value="365">365 días (anual)</option></select></label>
+      <label for="d-monto">Monto cobrado ($)<input id="d-monto" type="number" min="0" step="0.01" inputmode="decimal"></label>
+      <label for="d-medio">Medio<select id="d-medio"><option value="mercado_pago">Mercado Pago</option><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select></label>
+      <label for="d-nota">Nota (opcional)<input id="d-nota" maxlength="200"></label>
+    </div>
+    <p class="sub" id="d-aviso">Sube a Emprendedor y suma los días a lo que le queda. Queda anotado en Cobros.</p>
+    <div class="acts" style="margin-top:12px"><button type="button" class="btn sec" id="d-cancel">Cancelar</button><button type="submit" class="btn" id="d-ok">Registrar cobro</button></div>
+  </form>
+</dialog>
+
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+  // config.js define window.MADERUP_ADMIN = { url, key } (la clave es la «publishable», pública por diseño).
+  const $ = id => document.getElementById(id);
+  const cfg = window.MADERUP_ADMIN || {};
+  const state = { clients: [], payments: [], costs: null, metrics: null, alerts: [], alertCfg: null, days: 30, tab: 'clientes', q: '' };
+  const num = (k, d) => { try { return Number(localStorage.getItem(k)) || d; } catch { return d; } };
+  const keep = (k, v) => { try { localStorage.setItem(k, String(v)); } catch { /* sin almacenamiento */ } };
+  state.dolar = num('maderup_dolar', 1630); state.fijos = num('maderup_fijos', 50);
+  let sb = null;
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const day = iso => iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  const ars = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
+  const daysLeft = iso => iso ? Math.ceil((new Date(iso) - Date.now()) / 86400000) : null;
+  const PLAN = { basico: 'Gratis', esencial: 'Emprendedor' };
+  const METHOD = { mercado_pago: 'Mercado Pago', transferencia: 'Transferencia', efectivo: 'Efectivo', otro: 'Otro' };
+
+  function say(text, error = false, where = 'msg') {
+    const el = $(where); el.textContent = text; el.className = 'msg' + (error ? ' error' : ''); el.hidden = !text;
+  }
+
+  async function api(action, payload = {}) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('La sesión se cerró: volvé a entrar.');
+    const res = await fetch(cfg.url + '/functions/v1/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: cfg.key },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('Error ' + res.status));
+    return body.data;
+  }
+
+  // ---------- derivados ----------
+  const isLead = c => c.plan_id === 'basico' && c.quotes_limit != null && c.quotes_used >= c.quotes_limit;
+  const isNearLead = c => c.plan_id === 'basico' && c.quotes_limit != null && c.quotes_used === c.quotes_limit - 1 && c.quotes_limit > 1;
+  const expiring = c => c.valid_until && daysLeft(c.valid_until) <= 7;
+  const paying = c => c.plan_id !== 'basico';
+
+  // ---------- alertas de gasto ----------
+  const LIMITES = [
+    ['alert_daily_usd', 'Tope de IA por día (USD)'],
+    ['alert_month_usd', 'Tope de IA por mes (USD)'],
+    ['alert_user_day_usd', 'Tope por usuario y día (USD)'],
+    ['alert_error_pct', 'Aviso si fallan más de (% de pedidos)'],
+  ];
+  function renderAlerts() {
+    $('alerts').innerHTML = state.alerts.map(a => `<div class="alert ${a.level}" role="alert">${a.level === 'bad' ? '⚠ ' : ''}${esc(a.message)}</div>`).join('');
+  }
+  async function loadAlerts() {
+    try { const d = await api('alerts'); state.alerts = d.alerts; state.alertCfg = d.settings; renderAlerts(); if (state.tab === 'costos') render(); }
+    catch (err) { /* los avisos no son críticos: si fallan, el resto del tablero sigue andando */ }
+  }
+  function alertForm() {
+    const c = state.alertCfg; if (!c) return '';
+    return `<h2 style="margin-top:22px">Límites de aviso</h2><p class="sub">Si algo pasa de estos valores, aparece un cartel arriba de todo. Un valor en 0 apaga ese aviso.</p>
+      <div class="grid2">${LIMITES.map(([k, l]) => `<label for="${k}">${l}<input id="${k}" data-limite="${k}" type="number" min="0" step="0.5" value="${c[k]}"></label>`).join('')}</div>
+      <div class="acts" style="margin-top:10px"><button class="btn" id="guardar-limites">Guardar límites</button></div>`;
+  }
+
+  function kpis() {
+    const C = state.clients;
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const cobradoMes = state.payments.filter(p => new Date(p.paid_at) >= monthStart).reduce((a, p) => a + Number(p.amount_ars), 0);
+    $('kpis').innerHTML = [
+      ['Clientes', C.length], ['Pagan', C.filter(paying).length], ['Posibles clientes', C.filter(isLead).length],
+      ['Vencen en 7 días', C.filter(expiring).length], ['Cobrado este mes', ars(cobradoMes)],
+    ].map(([l, v]) => `<div class="card kpi"><b>${v}</b><span class="sub">${l}</span></div>`).join('');
+  }
+
+  // ---------- vistas ----------
+  function clientRow(c, extra = '') {
+    const left = daysLeft(c.valid_until);
+    const venc = c.valid_until ? `${day(c.valid_until)} <span class="pill ${left <= 7 ? 'mal' : 'ok'}">${left < 0 ? 'vencido' : left + ' d'}</span>` : '—';
+    const cupo = c.quotes_limit == null ? `${c.quotes_used} (sin tope)` : `${c.quotes_used} de ${c.quotes_limit}`;
+    return `<tr><td>${esc(c.email)}<div class="sub">alta ${day(c.created_at)} · última vez ${day(c.last_sign_in_at)}</div></td>
+      <td><span class="pill ${paying(c) ? 'ok' : ''}">${PLAN[c.plan_id] || esc(c.plan_id)}</span></td><td>${venc}</td><td class="n">${cupo}</td>
+      <td><div class="acts">${extra || actions(c)}</div></td></tr>`;
+  }
+  function actions(c) {
+    const e = esc(c.email);
+    return `<button class="btn" data-cobro="${e}">${paying(c) ? 'Renovar' : 'Cobré'}</button>` +
+      (paying(c) ? `<button class="btn mal" data-bajar="${e}">Bajar a Gratis</button>` : '') +
+      `<button class="btn sec" data-reset="${e}">Resetear uso</button>`;
+  }
+  function table(rows, empty) {
+    if (!rows.length) return `<div class="card sub">${empty}</div>`;
+    return `<div class="scroll"><table><thead><tr><th>Cliente</th><th>Plan</th><th>Vence</th><th class="n">Presupuestos mandados</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+  const leadMessage = 'Hola! Vi que ya mandaste tus presupuestos gratis en MaderUP. Si querés seguir sin límite, contame y lo vemos.';
+
+  function render() {
+    kpis();
+    const v = $('view'), C = state.clients;
+    if (state.tab === 'clientes') {
+      const q = state.q.toLowerCase();
+      const list = C.filter(c => !q || c.email.toLowerCase().includes(q));
+      v.innerHTML = `<label for="q" style="margin-bottom:10px">Buscar por email<input id="q" type="search" value="${esc(state.q)}"></label>` +
+        table(list.map(c => clientRow(c)), 'Todavía no hay clientes.');
+      const qi = $('q'); qi.addEventListener('input', () => { state.q = qi.value; render(); const n = $('q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
+    } else if (state.tab === 'leads') {
+      const hot = C.filter(isLead), warm = C.filter(isNearLead);
+      const lead = c => `<button class="btn" data-copiar>Copiar mensaje</button><a class="btn sec" style="text-decoration:none;display:inline-flex;align-items:center" href="mailto:${esc(c.email)}?subject=${encodeURIComponent('MaderUP')}&body=${encodeURIComponent(leadMessage)}">Escribir por mail</a>` ;
+      v.innerHTML = `<h2>Ya mandaron todos sus presupuestos gratis</h2>` + table(hot.map(c => clientRow(c, lead(c) + `<button class="btn sec" data-cobro="${esc(c.email)}">Cobré</button>`)), 'Nadie llegó al tope todavía.') +
+        `<h2 style="margin-top:22px">Les queda 1</h2>` + table(warm.map(c => clientRow(c, lead(c))), 'Nadie está por llegar.') +
+        `<p class="sub">La app todavía no guarda el celular del carpintero en el servidor, por eso el contacto es por mail o copiando el mensaje.</p>`;
+    } else if (state.tab === 'vencen') {
+      const list = C.filter(expiring).sort((a, b) => new Date(a.valid_until) - new Date(b.valid_until));
+      v.innerHTML = `<h2>Vencen en los próximos 7 días (o ya vencieron)</h2>` + table(list.map(c => clientRow(c)), 'No hay planes por vencer.');
+    } else if (state.tab === 'costos') {
+      v.innerHTML = renderCostos();
+    } else if (state.tab === 'uso') {
+      v.innerHTML = renderUso();
+    } else {
+      const P = state.payments;
+      v.innerHTML = `<h2>Cobros anotados</h2>` + (P.length ? `<div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Plan</th><th class="n">Días</th><th class="n">Monto</th><th>Medio</th><th>Nota</th></tr></thead><tbody>` +
+        P.map(p => `<tr><td>${day(p.paid_at)}</td><td>${esc(p.email)}</td><td>${PLAN[p.plan_id] || esc(p.plan_id)}</td><td class="n">${p.days}</td><td class="n">${ars(p.amount_ars)}</td><td>${METHOD[p.method] || esc(p.method)}</td><td>${esc(p.note)}</td></tr>`).join('') +
+        `</tbody></table></div>` : `<div class="card sub">Todavía no registraste cobros. Cuando un cliente te pague, tocá «Cobré» en su fila.</div>`);
+    }
+  }
+
+  // ---------- costos y uso ----------
+  const usd = n => 'USD ' + (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + ' %' : '—';
+  const periodo = () => `<div class="acts" style="margin-bottom:12px">${[7, 30, 90].map(d => `<button class="btn ${d === state.days ? '' : 'sec'}" data-dias="${d}">${d} días</button>`).join('')}</div>`;
+  const tbl = (head, rows, empty) => rows.length ? `<div class="scroll"><table><thead><tr>${head.map(h => `<th${h.n ? ' class="n"' : ''}>${h.t}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : `<div class="card sub">${empty}</div>`;
+
+  function renderCostos() {
+    const c = state.costs;
+    if (!c) return '<div class="card sub">Cargando costos…</div>';
+    const total = c.by_day.reduce((a, r) => a + Number(r.costo_usd), 0);
+    const mes = Number(c.month_usd) || 0;
+    const ingresosUsd = (Number(c.payments_month_ars) || 0) / state.dolar;
+    const resultado = ingresosUsd - mes - state.fijos;
+    const fns = {}; c.by_day.forEach(r => { const f = fns[r.fn] ||= { pedidos: 0, costo: 0, fallas: 0 }; f.pedidos += r.pedidos; f.costo += Number(r.costo_usd); f.fallas += r.fallas; });
+    const dias = {}; c.by_day.forEach(r => { dias[r.dia] = (dias[r.dia] || 0) + Number(r.costo_usd); });
+    const aviso = c.unpriced_models.length ? `<div class="msg error">Faltan los precios de: <b>${c.unpriced_models.map(esc).join(', ')}</b>. Mientras no estén en <code>model_prices</code> su costo sale en cero. Cargalos en el SQL Editor: <code>insert into public.model_prices (model, input_usd_per_mtok, output_usd_per_mtok) values ('${esc(c.unpriced_models[0])}', 0, 0);</code> con los valores de la tarifa vigente.</div>` : '';
+    return periodo() + aviso + `<div class="kpis">
+        <div class="card kpi"><b>${usd(total)}</b><span class="sub">IA, últimos ${c.days} días</span></div>
+        <div class="card kpi"><b>${usd(mes)}</b><span class="sub">IA este mes</span></div>
+        <div class="card kpi"><b>${ars(c.payments_month_ars)}</b><span class="sub">cobrado este mes (≈ ${usd(ingresosUsd)})</span></div>
+        <div class="card kpi"><b class="${resultado >= 0 ? '' : 'mal'}">${usd(resultado)}</b><span class="sub">resultado del mes (cobrado − IA − fijos)</span></div>
+      </div>
+      <div class="grid2" style="margin-bottom:14px">
+        <label for="dolar">Dólar ($ por USD)<input id="dolar" type="number" min="1" value="${state.dolar}"></label>
+        <label for="fijos">Costos fijos por mes (USD)<input id="fijos" type="number" min="0" value="${state.fijos}"></label>
+      </div>
+      <h2>Por función</h2>` + tbl([{ t: 'Función' }, { t: 'Pedidos', n: 1 }, { t: 'Fallas', n: 1 }, { t: 'Costo', n: 1 }, { t: 'Por pedido', n: 1 }],
+        Object.entries(fns).sort((a, b) => b[1].costo - a[1].costo).map(([f, x]) => `<tr><td>${esc(f)}</td><td class="n">${x.pedidos}</td><td class="n">${x.fallas}</td><td class="n">${usd(x.costo)}</td><td class="n">${x.pedidos ? usd(x.costo / x.pedidos) : '—'}</td></tr>`), 'Todavía no hay uso de IA registrado.') +
+      `<h2 style="margin-top:22px">Por cliente (este mes)</h2>` + tbl([{ t: 'Cliente' }, { t: 'Plan' }, { t: 'Pedidos', n: 1 }, { t: 'Costo', n: 1 }],
+        c.by_user.map(u => `<tr><td>${esc(u.email || 'sin email')}</td><td>${PLAN[u.plan] || esc(u.plan)}</td><td class="n">${u.pedidos}</td><td class="n">${usd(u.costo_usd)}</td></tr>`), 'Nadie usó IA este mes.') +
+      `<h2 style="margin-top:22px">Por día</h2>` + tbl([{ t: 'Día' }, { t: 'Costo', n: 1 }],
+        Object.entries(dias).slice(0, 31).map(([d, x]) => `<tr><td>${day(d)}</td><td class="n">${usd(x)}</td></tr>`), 'Sin datos.') + alertForm();
+  }
+
+  function renderUso() {
+    const m = state.metrics;
+    if (!m) return '<div class="card sub">Cargando uso…</div>';
+    const nombre = { rapido: 'Modo rápido', foto: 'Modo foto', sin_modo: 'Sin modo (otra sesión)' };
+    const f = m.funnel;
+    const tot = f.reduce((a, r) => { for (const k of ['iniciados', 'armaron', 'calcularon', 'pdf', 'compartieron', 'aceptados']) a[k] = (a[k] || 0) + r[k]; return a; }, {});
+    const pesos = m.valor.reduce((a, r) => a + Number(r.total_pesos), 0);
+    return periodo() + `<div class="kpis">
+        <div class="card kpi"><b>${m.activos_7d}</b><span class="sub">usuarios activos (7 días)</span></div>
+        <div class="card kpi"><b>${m.activos_30d}</b><span class="sub">usuarios activos (30 días)</span></div>
+        <div class="card kpi"><b>${m.mandados}</b><span class="sub">presupuestos mandados (${m.days} días)</span></div>
+        <div class="card kpi"><b>${ars(pesos)}</b><span class="sub">presupuestado (${m.days} días)</span></div>
+      </div>
+      <h2>Del inicio al presupuesto mandado</h2>` + tbl([{ t: 'Modo' }, { t: 'Iniciados', n: 1 }, { t: 'Armaron el mueble', n: 1 }, { t: 'Calcularon', n: 1 }, { t: 'Generaron PDF', n: 1 }, { t: 'Mandaron', n: 1 }, { t: 'Aceptados', n: 1 }, { t: 'Llegan a mandar', n: 1 }],
+        f.map(r => `<tr><td>${nombre[r.modo] || esc(r.modo)}</td><td class="n">${r.iniciados}</td><td class="n">${r.armaron}</td><td class="n">${r.calcularon}</td><td class="n">${r.pdf}</td><td class="n">${r.compartieron}</td><td class="n">${r.aceptados}</td><td class="n">${pct(r.compartieron, r.iniciados)}</td></tr>`),
+        'Todavía no hay eventos. Los manda la app de quien tenga activado «Compartir cómo uso la app».') +
+      `<p class="sub">Total: ${tot.iniciados || 0} iniciados, ${tot.calcularon || 0} calcularon, ${tot.compartieron || 0} mandaron. Cada columna cuenta sesiones.</p>
+      <h2 style="margin-top:22px">Cuánto tarda cada paso</h2>` + tbl([{ t: 'Paso' }, { t: 'Veces', n: 1 }, { t: 'Mediana', n: 1 }, { t: '9 de cada 10 tardan menos de', n: 1 }],
+        m.pasos.map(p => `<tr><td>${esc(p.paso)}</td><td class="n">${p.veces}</td><td class="n">${p.mediana_s} s</td><td class="n">${p.p90_s} s</td></tr>`), 'Sin datos de tiempos.') +
+      `<h2 style="margin-top:22px">Lo presupuestado por tipo de mueble</h2>` + tbl([{ t: 'Familia' }, { t: 'Presupuestos', n: 1 }, { t: 'Total', n: 1 }, { t: 'Promedio', n: 1 }],
+        m.valor.map(r => `<tr><td>${esc(r.familia)}</td><td class="n">${r.presupuestos}</td><td class="n">${ars(r.total_pesos)}</td><td class="n">${ars(r.promedio_pesos)}</td></tr>`), 'Sin presupuestos calculados todavía.') +
+      `<p class="sub">Los eventos no llevan nombre ni teléfono del cliente final.</p>`;
+  }
+
+  async function loadTab() {
+    try {
+      if (state.tab === 'costos') { state.costs = await api('costs', { days: state.days }); }
+      else if (state.tab === 'uso') { state.metrics = await api('metrics', { days: state.days }); }
+      render();
+    } catch (err) { say(err.message, true); }
+  }
+
+  // ---------- acciones ----------
+  let cobroEmail = null;
+  function openCobro(email) {
+    cobroEmail = email; $('dlg-who').textContent = email; $('d-monto').value = ''; $('d-nota').value = ''; $('d-dias').value = '30';
+    $('dlg').showModal(); $('d-monto').focus();
+  }
+  $('d-cancel').addEventListener('click', () => $('dlg').close());
+  $('dlg-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const monto = parseFloat($('d-monto').value);
+    if (!(monto >= 0)) { say('Poné el monto cobrado.', true); return; }
+    $('d-ok').disabled = true;
+    try {
+      await api('register_payment', { email: cobroEmail, plan: 'esencial', days: parseInt($('d-dias').value, 10), amount: monto, method: $('d-medio').value, note: $('d-nota').value });
+      $('dlg').close(); say('Cobro anotado y plan activado.'); await load();
+    } catch (err) { say(err.message, true); $('dlg').close(); } finally { $('d-ok').disabled = false; }
+  });
+
+  // Confirmación sin ventanas del navegador: el primer toque pide «¿Seguro?», el segundo lo hace.
+  const armed = new Map();
+  function confirmTap(btn, key, run, label) {
+    if (armed.get(key)) { armed.delete(key); run(); return; }
+    armed.set(key, true); const old = btn.textContent; btn.textContent = '¿Seguro? ' + label;
+    setTimeout(() => { armed.delete(key); if (btn.isConnected) btn.textContent = old; }, 4000);
+  }
+
+  $('view').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.cobro) openCobro(b.dataset.cobro);
+      else if (b.dataset.bajar) confirmTap(b, 'bajar' + b.dataset.bajar, async () => { await api('set_plan', { email: b.dataset.bajar, plan: 'basico' }); say('Volvió al plan Gratis.'); await load(); }, 'Bajar');
+      else if (b.dataset.reset) confirmTap(b, 'reset' + b.dataset.reset, async () => { await api('reset_usage', { email: b.dataset.reset }); say('Uso del mes en cero.'); await load(); }, 'Resetear');
+      else if (b.hasAttribute('data-copiar')) { await navigator.clipboard.writeText(leadMessage); b.textContent = 'Copiado'; }
+    } catch (err) { say(err.message, true); }
+  });
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    state.tab = t.dataset.t; document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t)); render();
+    if (state.tab === 'costos' || state.tab === 'uso') loadTab();
+  }));
+  // Período (7, 30 o 90 días) y los dos valores editables de la parte de costos.
+  $('view').addEventListener('click', e => {
+    const b = e.target.closest('button[data-dias]'); if (!b) return;
+    state.days = Number(b.dataset.dias); state.costs = null; state.metrics = null; render(); loadTab();
+  });
+  $('view').addEventListener('click', async e => {
+    if (e.target.id !== 'guardar-limites') return;
+    try {
+      for (const el of document.querySelectorAll('[data-limite]')) {
+        const value = parseFloat(el.value);
+        if (!(value >= 0)) throw new Error('Revisá los límites: tienen que ser números de 0 o más.');
+        if (value !== state.alertCfg[el.dataset.limite]) await api('set_alert', { key: el.dataset.limite, value });
+      }
+      say('Límites guardados.'); await loadAlerts();
+    } catch (err) { say(err.message, true); }
+  });
+  $('view').addEventListener('input', e => {
+    if (e.target.dataset.limite) return;
+    if (e.target.id === 'dolar') { state.dolar = Number(e.target.value) || state.dolar; keep('maderup_dolar', state.dolar); }
+    else if (e.target.id === 'fijos') { state.fijos = Number(e.target.value) || 0; keep('maderup_fijos', state.fijos); }
+    else return;
+    const id = e.target.id, pos = e.target.selectionStart; render(); const n = $(id); n.focus(); n.setSelectionRange(pos, pos);
+  });
+
+  async function load() {
+    try {
+      [state.clients, state.payments] = await Promise.all([api('clients'), api('payments')]);
+      render();
+      loadAlerts();
+      if (state.tab === 'costos' || state.tab === 'uso') await loadTab();
+    } catch (err) { say(err.message, true); }
+  }
+
+  // ---------- entrada ----------
+  async function enter(session) {
+    $('login').hidden = true; $('app').hidden = false; $('who').textContent = session.user.email;
+    await load();
+  }
+  $('refresh').addEventListener('click', load);
+  $('logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+  let sentTo = null;
+  $('l-go').addEventListener('click', async () => {
+    const email = $('l-email').value.trim();
+    $('l-go').disabled = true;
+    try {
+      if (!sentTo) {
+        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+        if (error) throw error;
+        sentTo = email; $('l-code-wrap').hidden = false; $('l-go').textContent = 'Entrar'; say('Te mandamos un código por email.', false, 'l-msg');
+      } else {
+        const { data, error } = await sb.auth.verifyOtp({ email: sentTo, token: $('l-code').value.trim(), type: 'email' });
+        if (error) throw error;
+        await enter(data.session);
+      }
+    } catch (err) { say(err.message || 'No se pudo entrar.', true, 'l-msg'); } finally { $('l-go').disabled = false; }
+  });
+
+  (async function start() {
+    if (!cfg.url || !cfg.key) {
+      $('login').hidden = false; say('Falta config.js (copiá config.example.js como config.js y completalo).', true, 'l-msg'); $('l-go').disabled = true; return;
+    }
+    sb = window.supabase.createClient(cfg.url, cfg.key);
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await enter(session); else $('login').hidden = false;
+  })();
+</script>
+</body>
+</html>
