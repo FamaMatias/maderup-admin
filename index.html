@@ -53,6 +53,7 @@
   <p class="sub">Solo para el dueño. Te mandamos un código por email.</p>
   <label for="l-email">Email<input id="l-email" type="email" autocomplete="email" placeholder="tu@email.com"></label>
   <label id="l-code-wrap" for="l-code" hidden>Código que te llegó<input id="l-code" inputmode="numeric" autocomplete="one-time-code"></label>
+  <div id="l-captcha" hidden></div>
   <button id="l-go" class="btn">Enviarme el código</button>
   <div id="l-msg" class="msg" hidden></div>
 </section>
@@ -93,6 +94,7 @@
 
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <script src="config.js"></script>
 <script>
   // config.js define window.MADERUP_ADMIN = { url, key } (la clave es la «publishable», pública por diseño).
@@ -363,14 +365,32 @@
   $('refresh').addEventListener('click', load);
   $('logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
 
+  // CAPTCHA (Cloudflare Turnstile): Supabase lo exige para pedir el código. La clave del sitio es pública
+  // y viene de config.js (`captchaKey`); sin ella no se muestra el desafío.
+  let captchaToken = null, captchaId = null;
+  function showCaptcha() {
+    if (!cfg.captchaKey || captchaId !== null) return;
+    if (!window.turnstile) { setTimeout(showCaptcha, 300); return; }
+    $('l-captcha').hidden = false;
+    captchaId = window.turnstile.render('#l-captcha', {
+      sitekey: cfg.captchaKey,
+      callback: (t) => { captchaToken = t; },
+      'expired-callback': () => { captchaToken = null; },
+      'error-callback': () => { captchaToken = null; say('No se pudo cargar el desafío. Recargá la página.', true, 'l-msg'); },
+    });
+  }
+
   let sentTo = null;
   $('l-go').addEventListener('click', async () => {
     const email = $('l-email').value.trim();
+    if (!sentTo && cfg.captchaKey && !captchaToken) { say('Resolvé el desafío de seguridad antes de pedir el código.', true, 'l-msg'); return; }
     $('l-go').disabled = true;
     try {
       if (!sentTo) {
-        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, captchaToken } });
+        if (window.turnstile && captchaId !== null) { window.turnstile.reset(captchaId); captchaToken = null; }
         if (error) throw error;
+        $('l-captcha').hidden = true;
         sentTo = email; $('l-code-wrap').hidden = false; $('l-go').textContent = 'Entrar'; say('Te mandamos un código por email.', false, 'l-msg');
       } else {
         const { data, error } = await sb.auth.verifyOtp({ email: sentTo, token: $('l-code').value.trim(), type: 'email' });
@@ -386,7 +406,7 @@
     }
     sb = window.supabase.createClient(cfg.url, cfg.key);
     const { data: { session } } = await sb.auth.getSession();
-    if (session) await enter(session); else $('login').hidden = false;
+    if (session) await enter(session); else { $('login').hidden = false; showCaptcha(); }
   })();
 </script>
 </body>

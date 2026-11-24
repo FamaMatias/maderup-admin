@@ -3,4 +3,5 @@
 window.MADERUP_ADMIN = {
   url: 'https://TU-PROYECTO.supabase.co',
   key: 'sb_publishable_...',
+  captchaKey: '0x4...', // clave del sitio de Cloudflare Turnstile (pública)
 };
